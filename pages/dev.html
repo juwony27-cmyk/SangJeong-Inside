@@ -1220,6 +1220,25 @@
       }
     }
 
+    .projects-track {
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: pan-y;
+    }
+
+    .projects-track.is-dragging {
+      scroll-snap-type: none;
+      scroll-behavior: auto;
+    }
+
+    .projects-track.is-dragging a {
+      pointer-events: none;
+    }
+
+    .projects-track img {
+      user-select: none;
+      -webkit-user-drag: none;
+    }
 
   </style>
 </head>
@@ -1782,10 +1801,15 @@
 <script>
   const projectTrack = document.querySelector('[data-project-track]');
   const projectScrollButtons = document.querySelectorAll('[data-project-scroll]');
+  let isPointerDown = false;
+  let isDragging = false;
+  let didDrag = false;
+  let startX = 0;
+  let startScrollLeft = 0;
+  let activePointerId = null;
   function getCardWidth() {
     if (!projectTrack) return 0;
-    const cards = projectTrack.querySelectorAll('.project-feature-card');
-    const card = cards[0];
+    const card = projectTrack.querySelector('.project-feature-card');
     if (!card) return 0;
     const trackStyle = getComputedStyle(projectTrack);
     const gap = parseFloat(trackStyle.columnGap || trackStyle.gap) || 20;
@@ -1819,7 +1843,65 @@
       });
     });
   });
-  projectTrack?.addEventListener('scroll', updateProjectScrollButtons);
+
+  if (projectTrack) {
+    projectTrack.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (event.target.closest('a, button')) return;
+      isPointerDown = true;
+      isDragging = false;
+      didDrag = false;
+      activePointerId = event.pointerId;
+      startX = event.clientX;
+      startScrollLeft = projectTrack.scrollLeft;
+      projectTrack.setPointerCapture(activePointerId);
+    });
+
+    projectTrack.addEventListener('pointermove', (event) => {
+      if (!isPointerDown || event.pointerId !== activePointerId) return;
+      const movedX = event.clientX - startX;
+      if (Math.abs(movedX) > 5) {
+        isDragging = true;
+        didDrag = true;
+        projectTrack.classList.add('is-dragging');
+      }
+      if (!isDragging) return;
+      event.preventDefault();
+      projectTrack.scrollLeft = startScrollLeft - movedX;
+      updateProjectScrollButtons();
+    });
+    function endProjectDrag() {
+      if (!projectTrack) return;
+      isPointerDown = false;
+      activePointerId = null;
+      setTimeout(() => {
+        isDragging = false;
+        projectTrack.classList.remove('is-dragging');
+      }, 0);
+      updateProjectScrollButtons();
+    }
+    projectTrack.addEventListener('pointerup', endProjectDrag);
+    projectTrack.addEventListener('pointercancel', endProjectDrag);
+    projectTrack.addEventListener('lostpointercapture', endProjectDrag);
+    projectTrack.addEventListener(
+      'click',
+      (event) => {
+        if (!didDrag) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        setTimeout(() => {
+          didDrag = false;
+        }, 0);
+      },
+      true
+    );
+    projectTrack.addEventListener('dragstart', (event) => {
+      event.preventDefault();
+    });
+    projectTrack.addEventListener('scroll', updateProjectScrollButtons);
+  }
   window.addEventListener('resize', updateProjectScrollButtons);
   updateProjectScrollButtons();
 </script>
